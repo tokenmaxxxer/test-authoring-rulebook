@@ -29,120 +29,139 @@ already a canon stub (issue-2) whose four strings are one-liners, and
 issue-1's phase-2 hard-gating decision was explicitly deferred, not
 pre-decided.
 
-## 3. Adopted methodology + required components for phase 2
+## 3. REVISION (issue-7 요구 정정, 승인자 FEEDBACK) — plugin-set structure
 
-**Methodology**: mirror the precedent already established elsewhere in the
-org for exactly this shape of problem — a role-specific `methodology-gate.sh`
-layered on top of (never replacing) core canon's generic
-`record-fields-gate.sh`, tested as a real subprocess against throwaway git
-fixtures, colocated at repo-root `tests/`. Order constraints are enforced
-by reading a sibling on-disk file's actual state at gate time, not by a
-separately maintained state machine. `Sources:` scout-brief.md,
-"Must-bes" and "Adopt / skip".
+> 승인자 FEEDBACK (PR #8): "단일 게이트/디렉티브 심화가 아니라
+> **플러그인 세트**로 체계화한다: 채택 방법론 각각을 독립 플러그인으로
+> (core의 freelunch/scout처럼 — 룰북당 여러 개, freelunch 수준의
+> 완성도). 기획서(phase 1) 규범과 산출물(phase 2) 규범도 각각을 플러그인
+> 조합으로 풀어낸다 — 어떤 플러그인들이 조합되어 그 규범이 성립하는지가
+> 설계의 본체. 각 플러그인 = 자기 완결(디렉티브/게이트/에이전트/테스트
+> 포함 가능), marketplace.json 등록, 명확한 단일 방법론 담당. proposal에는
+> 플러그인 목록(이름·담당 방법론·구성요소·조합 관계) 필수."
 
-**Required components for the phase-2 reflection**:
+The below supersedes the single `methodology-gate.sh` design from the
+prior revision of this proposal. §1's four items (directive deepening /
+methodology gate / gate tests / checklist) are still delivered, but as
+components distributed **across independently-registered plugins**, one
+per adopted methodology from issue-1(a)/(b) — never as one combined gate
+file checking every methodology's fields at once.
 
-1. **Directive deepening** — extend `directive.sh`'s four strings
-   (`YOU_DECIDE`/`USE_WHEN`/`PRODUCES`/`HAND_OFF`) with per-facet
-   stage/criteria/prohibition content, without breaking `stub-check.sh`'s
-   structural check (source line + plain assignments + one
-   `core_role_directive` call, nothing else — `Sources:` survey.md,
-   "Gaps… 1", citing `stub-check.sh` lines 90-100). Procedural depth that
-   would bloat the strings past a single-paragraph-per-facet size moves to
-   a new checklist file the strings reference by path, not inline.
-2. **`test-authoring/hooks/methodology-gate.sh`** (new) — a
-   `PreToolUse` (`Write|Edit|MultiEdit`) gate, structurally templated on
-   `pricing/hooks/methodology-gate.sh` (`Sources:` scout-brief.md,
-   "Adopt / skip"), checking two write surfaces:
-   - `docs/issue-<n>/proposals/*.md` authored by this role: the six
-     section headers from issue-1's phase-1 norm, at least one `Sources:`
-     line, **and** (the order constraint) that
-     `docs/issue-<n>/reports/test-authoring/survey.md` exists on disk
-     before the write is allowed to land — enforcing "survey pointer" to
-     actually point at a written file, not an aspirational one.
-   - `docs/issue-<n>/reports/test-authoring.md`: the five produces
-     components from issue-1(b) — suite architecture note, fixture
-     strategy, smell list, test-design-technique reference, traceability
-     line — as keyword-presence checks (`has_any`), the same technique
-     `pricing`'s gate already uses and that core's `record-fields-gate.sh`
-     already uses for the generic §20 fields.
-3. **`tests/methodology-gate-tests.sh`** (new, repo root) — real-subprocess
-   allow/deny cases for both write surfaces (proposal missing a section →
-   deny; proposal with all six sections but no `survey.md` on disk → deny;
-   proposal with all sections and an existing survey file → allow; record
-   missing traceability line → deny; complete record → allow; a write
-   outside either surface → allow/pass-through), following
-   `run-gate-tests.sh`'s `run()` helper shape (`Sources:` scout-brief.md,
-   "Must-bes", the gate-tests bullet).
-4. **`test-authoring/checklists/phase-2-suite-review.md`** (new) — the
-   repeated per-suite procedure issue-7 item 4 asks for: classify test
-   level against the pyramid, state fresh-vs-shared fixture choice, walk
-   the Meszaros 18-item smell catalog, cite EP/BVA (or mutation testing on
-   a thoroughness claim) per nontrivial test case, write the traceability
-   line. A checklist, not an `agents/` file — no autonomous multi-turn hunt
-   cadence exists for this role the way `warrant-hunter` does for another;
-   this is a working document a single session fills in per suite.
-5. **`test-authoring/hooks/hooks.json`** (edit) — register the new
-   `PreToolUse` `Write|Edit|MultiEdit` entry for `methodology-gate.sh`,
-   alongside the existing `SessionStart` and (unmodified, pre-existing gap)
-   `Bash` entries.
-6. **`README.md`** (edit) — flip the "Enforcement: advisory…" line to
-   describe the hard gate, and add a Checklists section pointing at item 4.
+### 3.1 Plugin list (name · methodology owned · components · composition)
 
-## 4. Rationale — why each adopted item follows from the domain research
+Each plugin below is self-contained (own `hooks/`, own gate script, own
+tests, own `.claude-plugin/plugin.json`), registered as its own entry in
+`.claude-plugin/marketplace.json` alongside the existing `test-authoring`
+role plugin — mirroring how core registers `freelunch` and `scout` as
+separate plugins rather than folding both into one. `Sources:`
+scout-brief.md, "Must-bes" (plugin self-containment), "Adopt / skip".
 
-- **Layer on canon, don't re-implement it**: `record-fields-gate.sh`
-  checks generic §20 fields; it structurally cannot know this role's
-  produces-shape vocabulary (a generic gate parameterized per-role would
-  be a core-repo change, out of this issue's write set, same reasoning
-  issue-1 already used for the traceability/test-design-technique fields).
-  `Sources:` scout-brief.md, "Must-bes", bullet 1.
-- **Existence-check over persisted state**: the only order constraint this
-  role's adopted methodology actually states (survey pointer in proposal
-  §2) is a single existence check, not a multi-step cadence. Building a
-  `state.sh`-equivalent for one boolean is the over-engineering
-  `implementation-rulebook` itself only reaches for when a role has an
-  actual multi-stage hunt (coding does; test-authoring does not).
-  `Sources:` scout-brief.md, "Adopt / skip".
-- **Real-subprocess tests at repo-root `tests/`**: this is the literal
-  precedent issue-7 names ("implementation-rulebook 수준"); reusing its
-  `run()` pattern is not a canon-copy (it is not on
-  `canon-manifest.txt`, and outcome-equivalent gate test harnesses already
-  exist per-rulebook, not centrally) — no reference-not-vendor conflict.
-  `Sources:` scout-brief.md, "Must-bes", gate-tests bullet;
-  `docs/handbooks/canon-scripts.md` (scoped to canon *hooks*, not test
-  harnesses).
-- **Checklist over agents/**: the scouted precedent for `agents/` in this
-  org (`warrant-hunter`) is an autonomous cross-session hunt cadence,
-  which is now canon-referenced, not role-owned. This role's repeated
-  procedure is a single-session review checklist with no hunt/handoff
-  shape — a checklist file is the components-that-fit match, not an
-  under-build.
+| # | Plugin name | Methodology owned | Components |
+|---|---|---|---|
+| 1 | `adr-proposal-shape` | ADR-style phase-1 proposal shape (issue-1(a)) | `hooks/proposal-shape-gate.sh` (`PreToolUse`, checks the six required section headers + ≥1 `Sources:` line + survey-file-exists order constraint on `docs/issue-<n>/proposals/*.md`); `tests/proposal-shape-gate-tests.sh` |
+| 2 | `xunit-suite-patterns` | Meszaros xUnit Test Patterns: test-level classification, fixture strategy, smell catalog (issue-1(b) items 1–3) | `hooks/suite-patterns-gate.sh` (checks suite-architecture-note + fixture-strategy + smell-list presence on `docs/issue-<n>/reports/test-authoring.md`); `checklists/smell-catalog.md` (Meszaros 18-item reference); `tests/suite-patterns-gate-tests.sh` |
+| 3 | `ep-bva-technique` | EP/BVA test-design-technique citation, mutation-testing-on-thoroughness-claim rule (issue-1(b) item 4) | `hooks/technique-gate.sh` (checks a technique citation exists per nontrivial test case reference in the record; escalates to requiring a mutation-testing mention only when the record's language claims thoroughness); `tests/technique-gate-tests.sh` |
+| 4 | `traceability-line` | One-line requirement↔suite traceability (issue-1(b) item 5, IEEE 829's transferable principle) | `hooks/traceability-gate.sh` (checks one traceability line per suite section, cross-referencing the issue number in the branch name); `tests/traceability-gate-tests.sh` |
+
+Each plugin owns exactly one methodology, so each plugin's gate touches
+only the record fields that methodology defines — a suite-patterns
+violation and a traceability violation surface as two independent gate
+failures, not one combined gate's single pass/fail. `Sources:`
+scout-brief.md, "Adopt / skip" (methodology-per-plugin granularity).
+
+### 3.2 Composition: how phase-1 and phase-2 norms are built from the set
+
+- **Phase-1 proposal norm (issue-1(a))** = `adr-proposal-shape` alone.
+  One methodology, one plugin; no composition needed.
+- **Phase-2 deliverable norm (issue-1(b))** = `xunit-suite-patterns` +
+  `ep-bva-technique` + `traceability-line`, composed by all three gates
+  firing on the same `PreToolUse` write to
+  `docs/issue-<n>/reports/test-authoring.md`. The record is well-formed
+  only when all three independently pass — the norm is the conjunction,
+  not a fourth combined gate re-checking the same file. This composition
+  relation (which plugins, ANDed on which write surface, make up which
+  norm) is the design artifact the approver asked for, not implementation
+  detail buried in a single gate script.
+- The existing `test-authoring` role plugin keeps `directive.sh`'s four
+  strings and `hooks.json`, but each string's `PRODUCES`/`HAND_OFF`
+  content now *points at* the composing plugins' checklists/gates by name
+  instead of inlining the requirements — the role plugin orchestrates
+  which methodology-plugins apply; it does not itself encode any single
+  methodology's rules.
+
+## 4. Rationale — why plugin-set over single-gate
+
+- **Matches the org's own precedent literally**: `freelunch` and `scout`
+  are core's two separate plugins for two separate methodologies
+  (parallel-decomposition dispatch vs. pre-generation field scouting);
+  neither folds into the other despite both firing on similar lifecycle
+  points. A single `methodology-gate.sh` checking five unrelated
+  methodologies at once is the shape the org's own precedent already
+  rejects. `Sources:` scout-brief.md, "Must-bes", bullet 1.
+- **One methodology, one plugin, keeps ownership legible**: when EP/BVA
+  citation practice changes independently of the smell-catalog checklist
+  (a realistic future edit — the two evolve on different cadences), a
+  single combined gate forces touching one file for either change; four
+  independent plugins let each evolve, version, and even be
+  disabled/enabled independently, which is the actual reason core keeps
+  `freelunch` and `scout` separate rather than merged.
+- **Existence-check over persisted state (unchanged from prior revision)**:
+  the one order constraint this role's methodology states (survey pointer)
+  is still a single existence check inside `adr-proposal-shape`'s gate,
+  not a separately maintained state machine — no methodology here has an
+  actual multi-stage hunt cadence the way `implementation-rulebook`'s
+  progress gate does. `Sources:` scout-brief.md, "Adopt / skip".
+- **Real-subprocess tests per plugin, not one shared harness**: each
+  plugin's `tests/*-gate-tests.sh` is scoped to its own gate's allow/deny
+  cases, following `run-gate-tests.sh`'s `run()` helper shape per plugin
+  rather than one repo-root file enumerating every methodology's cases —
+  consistent with "freelunch 완성도" (each plugin ships its own tests, not
+  a shared central one). `Sources:` scout-brief.md, "Must-bes", gate-tests
+  bullet.
+- **No `agents/` needed**: none of the four methodologies has an
+  autonomous cross-session hunt cadence the way `warrant-hunter` does;
+  `xunit-suite-patterns` ships a checklist file instead, which is still a
+  self-contained plugin component, just not an agent.
 
 ## 5. Plugin reflection plan (phase 2, once approved)
 
 Write set (frozen on approval):
 
-- `test-authoring/hooks/directive.sh` (edit — deepen the four strings,
-  keep stub-check.sh-compliant)
-- `test-authoring/hooks/methodology-gate.sh` (new)
-- `test-authoring/hooks/hooks.json` (edit — add `Write|Edit|MultiEdit`
-  `PreToolUse` entry)
-- `test-authoring/checklists/phase-2-suite-review.md` (new)
-- `tests/methodology-gate-tests.sh` (new, repo root)
-- `README.md` (edit — Enforcement + Checklists sections)
+- `.claude-plugin/marketplace.json` (edit — register the four new plugin
+  entries alongside the existing `test-authoring` entry)
+- `adr-proposal-shape/.claude-plugin/plugin.json`,
+  `adr-proposal-shape/hooks/proposal-shape-gate.sh`,
+  `adr-proposal-shape/tests/proposal-shape-gate-tests.sh` (new)
+- `xunit-suite-patterns/.claude-plugin/plugin.json`,
+  `xunit-suite-patterns/hooks/suite-patterns-gate.sh`,
+  `xunit-suite-patterns/checklists/smell-catalog.md`,
+  `xunit-suite-patterns/tests/suite-patterns-gate-tests.sh` (new)
+- `ep-bva-technique/.claude-plugin/plugin.json`,
+  `ep-bva-technique/hooks/technique-gate.sh`,
+  `ep-bva-technique/tests/technique-gate-tests.sh` (new)
+- `traceability-line/.claude-plugin/plugin.json`,
+  `traceability-line/hooks/traceability-gate.sh`,
+  `traceability-line/tests/traceability-gate-tests.sh` (new)
+- `test-authoring/hooks/directive.sh` (edit — deepen the four strings to
+  reference the composing plugins by name/path, keep
+  stub-check.sh-compliant)
+- `test-authoring/hooks/hooks.json` (unchanged — each new plugin registers
+  its own gate under its own `hooks.json`, not this role's)
+- `README.md` (edit — Enforcement section names the plugin set and the
+  composition relation from §3.2)
 - `docs/issue-7/reports/test-authoring.md` (create — phase-2 record,
-  including the test run's pass/fail output)
+  including each plugin's own test run's pass/fail output)
 
-Steps: write `methodology-gate.sh` from the pricing template with
-test-authoring's own section/field vocabulary → write the checklist →
-deepen `directive.sh`'s four strings and point `PRODUCES`/`HAND_OFF` at the
-checklist path → register the gate in `hooks.json` → write
-`tests/methodology-gate-tests.sh` and run it (`bash tests/
-methodology-gate-tests.sh`), pasting its pass/fail summary into the
-phase-2 record → run `core/hooks/tests/stub-check.sh test-authoring/hooks`
-(canon-referenced, not vendored) and paste its output too, confirming the
-deepened `directive.sh` still passes the structural stub check.
+Steps: scaffold each plugin's `.claude-plugin/plugin.json` → write each
+gate script scoped to its one methodology's fields → write each plugin's
+own gate-tests file and run it, pasting all four pass/fail summaries into
+the phase-2 record → write `xunit-suite-patterns`'s smell-catalog
+checklist → deepen `test-authoring/hooks/directive.sh`'s four strings to
+point at the composing plugins → register all four plugins in
+`.claude-plugin/marketplace.json` → run
+`core/hooks/tests/stub-check.sh test-authoring/hooks` (canon-referenced,
+not vendored) and paste its output, confirming the deepened `directive.sh`
+still passes the structural stub check.
 
 ## 6. Deliberately out of scope
 
@@ -154,16 +173,21 @@ deepened `directive.sh` still passes the structural stub check.
   per the constraint.
 - Mutation-testing tooling selection — out of scope since issue-1, not
   reopened.
-- Hard-gating the exact keyword list in `methodology-gate.sh` is a
-  judgment call (which phrases count as "traceability line present," etc.)
-  made in phase 2 following `pricing`'s `has_any` precedent; flagged here
-  because a keyword-presence check can both false-deny (unusual phrasing)
-  and false-allow (phrase present but not meaningfully satisfying the
+- Hard-gating the exact keyword list in each plugin's gate (e.g. what
+  phrases count as "traceability line present") is a judgment call made in
+  phase 2 following `pricing`'s `has_any` precedent; flagged here because a
+  keyword-presence check can both false-deny (unusual phrasing) and
+  false-allow (phrase present but not meaningfully satisfying the
   component) — the same tradeoff `pricing`'s and core's own gates already
   accept, not a new risk this proposal introduces silently.
-- `write_scope` (`['test/**']`) is unchanged; the new gate/tests/checklist
-  files govern this role's own plugin and proposal/record surfaces, a
-  distinct write surface from the test-suite output `write_scope` covers.
+- `write_scope` (`['test/**']`) is unchanged; the new plugins' gate/tests/
+  checklist files govern this role's proposal/record surfaces, a distinct
+  write surface from the test-suite output `write_scope` covers.
+- Whether the four new plugins ship in this rulebook's repo or a shared
+  location is a phase-2 judgment call following whatever precedent
+  `core`'s own multi-plugin layout sets; this proposal assumes same-repo
+  (`./adr-proposal-shape`, etc., siblings of `./test-authoring`) since
+  no cross-repo plugin-sharing mechanism was found in the scout pass.
 
 ## loop_state
 
