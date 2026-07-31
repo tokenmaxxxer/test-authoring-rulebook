@@ -12,20 +12,24 @@ generated as skeleton scaffolding by issue-167.
 
 ## Install
 
+This rulebook expects the following companion plugins installed alongside it:
+`core`, `warrant`, `scout`, `terse`, `freelunch`.
+
 ```
 claude plugin marketplace add tokenmaxxxer/test-authoring-rulebook
 claude plugin install test-authoring
+claude plugin install core
+claude plugin install warrant
+claude plugin install scout
+claude plugin install terse
+claude plugin install freelunch
 ```
 
 ## Layout
 
 - `test-authoring/.claude-plugin/plugin.json` — plugin manifest
 - `test-authoring/hooks/hooks.json` — SessionStart + PreToolUse wiring
-- `test-authoring/hooks/directive.sh` — SessionStart role directive
-- `test-authoring/hooks/record-fields-gate.sh` — this role's record required-field gate
-- `test-authoring/hooks/trailer-gate.sh` — commit `Subject: issue-<n>` trailer gate
-- `test-authoring/hooks/handbook-trigger-gate.sh` — s21 handbook-sync gate
-- `test-authoring/agents/warrant-hunter.md` — rotating-stance hunt agent
+- `test-authoring/hooks/directive.sh` — SessionStart role directive (stub over core's `role-directive.sh`)
 - `docs/specs/approvers.md` — Approve-authority allowlist (see below)
 
 This is scaffolding, not a finished rulebook: fill in doctrine detail,
