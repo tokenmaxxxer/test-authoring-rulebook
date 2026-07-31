@@ -1,0 +1,7 @@
+{
+  "name": "adr-proposal-shape",
+  "description": "Gates test-authoring's phase-1 proposals against the six required ADR-derived sections (issue-1(a)). use_when: any Write/Edit/MultiEdit to docs/issue-<n>/proposals/*.md under this role.",
+  "author": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  }
+}

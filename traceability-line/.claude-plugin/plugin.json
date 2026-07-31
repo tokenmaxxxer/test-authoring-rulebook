@@ -1,0 +1,7 @@
+{
+  "name": "traceability-line",
+  "description": "Gates test-authoring's phase-2 record for a one-line requirement-to-suite traceability statement per suite section (issue-1(b) item 5, IEEE 829's transferable principle). use_when: any Write/Edit/MultiEdit to docs/issue-<n>/reports/test-authoring.md under this role.",
+  "author": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  }
+}

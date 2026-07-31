@@ -8,6 +8,26 @@
       "name": "test-authoring",
       "source": "./test-authoring",
       "description": "The test-authoring role on contract v3 (issue-160 round-4 promotion). Decides: 테스트 코드 자체가 격리성·fixture 전략 면에서 좋은 설계인가."
+    },
+    {
+      "name": "adr-proposal-shape",
+      "source": "./adr-proposal-shape",
+      "description": "Gates test-authoring's phase-1 proposals against the six required ADR-derived sections (issue-1(a)). use_when: any Write/Edit/MultiEdit to docs/issue-<n>/proposals/*.md under this role."
+    },
+    {
+      "name": "xunit-suite-patterns",
+      "source": "./xunit-suite-patterns",
+      "description": "Gates test-authoring's phase-2 record for suite-architecture-note, fixture-strategy, and smell-list presence (issue-1(b) items 1-3, Meszaros). use_when: any write to docs/issue-<n>/reports/test-authoring.md."
+    },
+    {
+      "name": "ep-bva-technique",
+      "source": "./ep-bva-technique",
+      "description": "Gates test-authoring's phase-2 record for a test-design-technique citation, escalating to a mutation-testing mention on thoroughness claims (issue-1(b) item 4). use_when: any write to docs/issue-<n>/reports/test-authoring.md."
+    },
+    {
+      "name": "traceability-line",
+      "source": "./traceability-line",
+      "description": "Gates test-authoring's phase-2 record for a one-line requirement-to-suite traceability statement per suite section (issue-1(b) item 5). use_when: any write to docs/issue-<n>/reports/test-authoring.md."
     }
   ]
 }
