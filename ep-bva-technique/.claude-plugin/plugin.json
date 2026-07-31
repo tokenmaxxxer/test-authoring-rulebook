@@ -1,0 +1,7 @@
+{
+  "name": "ep-bva-technique",
+  "description": "Owns test-authoring's EP/BVA test-design-technique citation methodology (issue-1(b) item 4): gates the phase-2 record for a technique citation and escalates to requiring a mutation-testing mention when the record's language claims thoroughness. use_when: any Write/Edit/MultiEdit to docs/issue-<n>/reports/test-authoring.md under this role.",
+  "author": {
+    "name": "Jung Jiwon & Lee Jongkwan"
+  }
+}

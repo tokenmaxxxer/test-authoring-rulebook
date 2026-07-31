@@ -27,7 +27,23 @@ brief; unsourced claims are stated as labeled assumptions, never fact.
 5. Traceability line — one line per suite linking it to the issue/
    requirement it covers.
 
-Enforcement: advisory via `hooks/directive.sh` PRODUCES text; no local
-`record-fields-gate.sh` (canon-referenced per issue #63 / issue-2
-precedent). Hard-gating items 4-5 was left to a future explicit decision,
-not pre-decided by issue-1.
+Enforcement (issue-7): a plugin-set, not one combined gate — each adopted
+methodology is its own independently-registered plugin, mirroring how
+core registers `freelunch` and `scout` separately rather than folding both
+into one:
+
+- **Phase-1 proposal norm** = `adr-proposal-shape` alone (six required
+  sections + `Sources:` + survey-exists order constraint on
+  `docs/issue-<n>/proposals/*.md`).
+- **Phase-2 deliverable norm** = `xunit-suite-patterns` + `ep-bva-technique`
+  + `traceability-line`, composed by all three gates firing on the same
+  `docs/issue-<n>/reports/test-authoring.md` write — the record is
+  well-formed only when all three independently pass (the norm is the
+  conjunction, not a fourth combined gate).
+
+`hooks/directive.sh`'s PRODUCES text now points at these composing
+plugins by name instead of inlining the requirements; each plugin ships
+its own `README.md`/`hooks.json`/kill switch/tests
+(`docs/issue-7/proposals/methodology-enforcement-machine.md` §3.3.1).
+`test-authoring-progress-gate.sh` (referenced in `hooks.json`) remains a
+pre-existing missing file, out of this issue's scope.
