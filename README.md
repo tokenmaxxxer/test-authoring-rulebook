@@ -28,8 +28,16 @@ claude plugin install freelunch
 ## Layout
 
 - `test-authoring/.claude-plugin/plugin.json` — plugin manifest
-- `test-authoring/hooks/hooks.json` — SessionStart + PreToolUse wiring
+- `test-authoring/hooks/hooks.json` — SessionStart wiring
 - `test-authoring/hooks/directive.sh` — SessionStart role directive (stub over core's `role-directive.sh`)
+- `adr-proposal-shape/`, `ep-bva-technique/`, `traceability-line/`,
+  `xunit-suite-patterns/` — the four composing plugins that enforce this
+  role's methodology norms (issue-7), each with its own
+  `PreToolUse`/`Write|Edit|MultiEdit` gate migrated to
+  `tokenmaxxxer-core`'s gate-house standard (issue-72/issue-10)
+- `tests/resolve-core.sh`, `tests/run-all-gate-tests.sh` — shared test
+  harness resolving `CLAUDE_PLUGIN_ROOT_CORE` and aggregating each
+  plugin's gate test suite
 - `docs/specs/approvers.md` — Approve-authority allowlist (see below)
 
 This is scaffolding, not a finished rulebook: fill in doctrine detail,

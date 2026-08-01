@@ -45,5 +45,25 @@ into one:
 plugins by name instead of inlining the requirements; each plugin ships
 its own `README.md`/`hooks.json`/kill switch/tests
 (`docs/issue-7/proposals/methodology-enforcement-machine.md` §3.3.1).
-`test-authoring-progress-gate.sh` (referenced in `hooks.json`) remains a
-pre-existing missing file, out of this issue's scope.
+
+## Gate-house standard migration (issue-10)
+
+All four composing plugins' `Write|Edit|MultiEdit` gates
+(`adr-proposal-shape`, `ep-bva-technique`, `traceability-line`,
+`xunit-suite-patterns`) source `tokenmaxxxer-core`'s
+`core/hooks/lib/gate-lib.sh`/`gate-lib.py` (the gate-house standard, core
+issue #72) for their fail-closed trap, kill-switch check, JSON parsing,
+path normalization, and `Write`/`Edit`/`MultiEdit`/`NotebookEdit`
+reconstruction, replacing former hand-rolled copies — reference only,
+never vendored. This base plugin has no `Write|Edit|MultiEdit` gate of
+its own to migrate.
+
+This plugin's own `hooks.json` previously registered a `PreToolUse`/
+`Bash` hook pointing at `test-authoring-progress-gate.sh`, a script that
+never existed in this repo — every `Bash` tool call in this role's
+session failed the hook launch. That dangling entry is removed; the
+role's five real methodology checks all live in the four composing
+plugins, matched on `Write|Edit|MultiEdit`. `gate_bash_write_targets`
+(gate-lib.sh) stays unadopted here — none of the four real gates need
+`Bash`-write detection (their write surfaces are role-authored markdown
+under `docs/`, not shell-command targets).

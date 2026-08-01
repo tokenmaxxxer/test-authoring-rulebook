@@ -13,18 +13,27 @@ mechanically rather than left to reviewer judgment.
 - `hooks/hooks.json` — registers `hooks/technique-gate.sh` under
   `PreToolUse` (`matcher: "Write|Edit|MultiEdit"`), scoped to
   `${CLAUDE_PLUGIN_ROOT}`.
-- `hooks/technique-gate.sh` — fail-closed `PreToolUse` gate. Fires only on
-  writes to `docs/issue-<n>/reports/test-authoring.md`. Reconstructs the
-  resulting content for `Write`/`Edit`/`MultiEdit` (denying when it cannot
-  be determined) and checks, on the lower-cased text: (1) at least one
-  EP/BVA technique-naming keyword is present, denying otherwise; (2) if a
-  thoroughness-claim keyword is present, at least one mutation-testing
-  keyword must also be present, denying otherwise. Kill switch:
-  `EP_BVA_TECHNIQUE_GATE_OFF` (off-means-off; an unrecognized non-empty
-  value disables the gate and logs a warning, mirroring `freelunch.sh`).
-- `tests/technique-gate-tests.sh` — five real-subprocess allow/deny cases
-  against a throwaway git-init'd fixture, per
-  `implementation-rulebook/tests/run-gate-tests.sh`'s pattern.
+- `hooks/technique-gate.sh` — fail-closed `PreToolUse` gate, sourcing
+  `tokenmaxxxer-core`'s `core/hooks/lib/gate-lib.sh`/`gate-lib.py` (the
+  gate-house standard, core issue #72, reference only) for the trap,
+  kill switch, JSON parse, path normalize, and `Write`/`Edit`/`MultiEdit`/
+  `NotebookEdit` reconstruction. Fires only on writes to
+  `docs/issue-<n>/reports/test-authoring.md`. Checks, per paragraph
+  (blank-line-delimited): (1) an EP/BVA technique-naming keyword must
+  share a paragraph with a test-case-shaped reference (a heading, a
+  bullet, or a `test`-prefixed token) — a citation dropped elsewhere in
+  the document no longer counts; (2) if a paragraph makes a thoroughness
+  claim, a mutation-testing mention must appear in that same paragraph.
+  Kill switch: `EP_BVA_TECHNIQUE_GATE_OFF` — only a recognized on-spelling
+  (`1`/`true`/`yes`/`on`) disables the gate; empty, a recognized
+  off-spelling, or any unrecognized value all keep it active (the
+  correctness fix: the pre-issue-10 version disabled on any unrecognized
+  value).
+- `tests/technique-gate-tests.sh` — real-subprocess allow/deny cases
+  against a throwaway git-init'd fixture, including the mandatory `Edit`/
+  `MultiEdit`-with-`replace_all`, malformed-JSON, unrecognized-kill-switch-
+  stays-active, and absolute/`./`-path cases, plus adjacency-upgrade
+  cases (citation present but not paragraph-adjacent to a test reference).
 
 ## Scope of evidence
 
