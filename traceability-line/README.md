@@ -15,12 +15,17 @@ one — it looks traced but points at the wrong requirement.
 - `.claude-plugin/plugin.json` — plugin identity: name, description
   (methodology owned + `use_when`), author.
 - `hooks/hooks.json` — registers `hooks/traceability-gate.sh` under
-  `PreToolUse` for `Write|Edit|MultiEdit`, scoped to
-  `${CLAUDE_PLUGIN_ROOT}`.
+  `PreToolUse` for `Write|Edit|MultiEdit|NotebookEdit`, scoped to
+  `${CLAUDE_PLUGIN_ROOT}` (matcher widened to `NotebookEdit` in issue-13's
+  closeout so it reaches the gate's already-existing `NotebookEdit`
+  reconstruction branch).
 - `hooks/traceability-gate.sh` — fail-closed `PreToolUse` gate, sourcing
   `tokenmaxxxer-core`'s `core/hooks/lib/gate-lib.sh`/`gate-lib.py` (the
-  gate-house standard, core issue #72, reference only) for the trap,
-  kill switch, JSON parse, path normalize, and `Write`/`Edit`/`MultiEdit`/
+  gate-house standard, core issue #72, reference only) with an
+  `||`-guarded source line (issue-75/issue-13: an unreachable core now
+  denies via exit 2 instead of silently allowing every write, covered by
+  a dedicated missing-core deny test case) for the trap, kill switch,
+  JSON parse, path normalize, and `Write`/`Edit`/`MultiEdit`/
   `NotebookEdit` reconstruction. Fires only on writes to
   `docs/issue-<n>/reports/test-authoring.md`. Denies (exit 2) when: (a) no
   traceability-keyword line is present at all, or (b) a traceability line

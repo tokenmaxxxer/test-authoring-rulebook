@@ -12,15 +12,20 @@ exist on disk before the proposal is allowed to land.
 ## How it works
 
 - `hooks/hooks.json` — registers `hooks/proposal-shape-gate.sh` on
-  `PreToolUse` for `Write|Edit|MultiEdit`, scoped to
-  `${CLAUDE_PLUGIN_ROOT}`.
+  `PreToolUse` for `Write|Edit|MultiEdit|NotebookEdit`, scoped to
+  `${CLAUDE_PLUGIN_ROOT}` (matcher widened to `NotebookEdit` in issue-13's
+  closeout so it reaches the gate's already-existing `NotebookEdit`
+  reconstruction branch).
 - `hooks/proposal-shape-gate.sh` — the gate itself. Sources
   `tokenmaxxxer-core`'s `core/hooks/lib/gate-lib.sh` (fail-closed trap,
-  kill switch) and loads `gate-lib.py` (JSON parse, path normalize,
+  kill switch) with an `||`-guarded source line (issue-75/issue-13: an
+  unreachable core now denies via exit 2 instead of silently allowing
+  every write) and loads `gate-lib.py` (JSON parse, path normalize,
   `Write`/`Edit`/`MultiEdit`/`NotebookEdit` reconstruction) — the
   gate-house standard, core issue #72, reference only, never vendored —
   and denies (exit 2) when the resulting content is indeterminate rather
-  than guessing. Checks each of the six required section headers as a
+  than guessing. A missing/unresolvable `CLAUDE_PLUGIN_ROOT_CORE` is
+  covered by a dedicated deny test case (issue-13). Checks each of the six required section headers as a
   markdown heading line (`^#{1,3}\s+...`), not merely present in prose,
   plus a lower-cased substring check for the `Sources:` line, and
   separately denies when the matching `survey.md` for that issue number

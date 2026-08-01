@@ -10,10 +10,15 @@ and a smell list drawn from Meszaros' test-smell catalog — or an explicit
 ## How it works
 
 - `hooks/suite-patterns-gate.sh` — `PreToolUse` gate (`Write|Edit|
-  MultiEdit`) on `docs/issue-<n>/reports/test-authoring.md`, sourcing
+  MultiEdit|NotebookEdit`, matcher widened in issue-13's closeout so it
+  reaches the gate's already-existing `NotebookEdit` reconstruction
+  branch) on `docs/issue-<n>/reports/test-authoring.md`, sourcing
   `tokenmaxxxer-core`'s `core/hooks/lib/gate-lib.sh`/`gate-lib.py` (the
-  gate-house standard, core issue #72, reference only) for the trap,
-  kill switch, JSON parse, path normalize, and `Write`/`Edit`/`MultiEdit`/
+  gate-house standard, core issue #72, reference only) with an
+  `||`-guarded source line (issue-75/issue-13: an unreachable core now
+  denies via exit 2 instead of silently allowing every write, covered by
+  a dedicated missing-core deny test case) for the trap, kill switch,
+  JSON parse, path normalize, and `Write`/`Edit`/`MultiEdit`/
   `NotebookEdit` reconstruction. The suite-architecture check now requires
   a pyramid-level word (unit/integration/e2e) and a test-level/pyramid
   term on the same or an adjacent line, and the fixture-strategy check
