@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-__fc(){ rc=$?; if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then echo "fail-closed: gate aborted (rc=$rc)" >&2; exit 2; fi; }
-trap __fc EXIT
 # PreToolUse gate (Write|Edit|MultiEdit) — test-authoring-role-specific,
 # owning exactly one methodology: IEEE 829's transferable
 # requirement-to-test-case traceability principle (issue-1(b) item 5).
@@ -13,88 +11,61 @@ trap __fc EXIT
 # "traces"/"traceability"/"covers issue"/"requirement:" AND matching
 # issue-\d+|#\d+. Additionally denies when the traceability line's issue
 # number does not match the issue number in the current branch name
-# (issue-<n>/...) — a cross-reference mismatch. Fails closed when the
-# resulting content cannot be determined, mirroring
-# pricing/hooks/methodology-gate.sh's fail-closed pattern.
+# (issue-<n>/...) — a cross-reference mismatch. Already line-scoped
+# (not substring theater), so no semantic change from issue-10 — only
+# the trap/kill-switch/JSON/path/reconstruct internals migrate below.
 #
-# Kill switch: export TRACEABILITY_LINE_GATE_OFF=1 (off-means-off per
-# freelunch.sh lines ~17-30: only ""|0|false|no|off count as not-off; any
-# other non-empty value disables the gate; an unrecognized non-empty
-# value still disables it, with a warning on stderr).
+# Migrated to the gate-house standard (core issue #72): sources
+# core/hooks/lib/gate-lib.sh / loads gate-lib.py for the fail-closed trap,
+# kill-switch convention, JSON parse, path normalize and Write/Edit/
+# MultiEdit/NotebookEdit reconstruction primitives (issue-10). This is
+# also the correctness fix: the pre-issue-10 version disabled on ANY
+# unrecognized kill-switch value.
+#
+# Kill switch: export TRACEABILITY_LINE_GATE_OFF=1 — only a recognized
+# on-spelling (1/true/yes/on, case-insensitive) disables the gate; empty,
+# a recognized off-spelling, or any unrecognized value all keep it active.
+CORE_HOOKS_ROOT="${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks"
+. "$CORE_HOOKS_ROOT/lib/gate-lib.sh"
+gate_trap_fail_closed
 set -uo pipefail
 
-role="${CLAUDE_ROLE:-test-authoring}"
-deny() { echo "${role}: refused — $1" >&2; exit 2; }
+GATE_NAME="test-authoring"
 
 # Drain stdin unconditionally first, so an early kill-switch exit never
 # leaves the caller's write end of the pipe blocked/SIGPIPEd.
 payload="$(cat 2>/dev/null || true)"
 
-_tlg_off_raw="${TRACEABILITY_LINE_GATE_OFF:-}"
-_tlg_off_norm="$(printf '%s' "$_tlg_off_raw" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-case "$_tlg_off_norm" in
-  ""|0|false|no|off) ;;
-  *) echo "traceability-line: TRACEABILITY_LINE_GATE_OFF='${_tlg_off_raw}' — gate disabled" >&2; exit 0 ;;
-esac
+gate_kill_switch_active "${TRACEABILITY_LINE_GATE_OFF:-}" || { trap - EXIT; exit 0; }
 
-command -v python3 >/dev/null 2>&1 || deny "traceability-gate.sh requires python3, which is not on PATH; denying rather than guessing."
-
-[ -n "$payload" ] || deny "traceability-gate: empty tool-use payload on stdin; cannot evaluate the traceability gate."
-
-_target="$(printf '%s' "$payload" | python3 -c '
-import json,sys
-try: e=json.loads(sys.stdin.read())
-except Exception: sys.exit(0)
-ti=e.get("tool_input") if isinstance(e,dict) else None
-if isinstance(ti,dict):
-    for k in ("file_path","notebook_path"):
-        v=ti.get(k)
-        if isinstance(v,str) and v: print(v); break
-' 2>/dev/null || true)"
+command -v python3 >/dev/null 2>&1 || gate_deny "$GATE_NAME" "traceability-gate.sh requires python3, which is not on PATH; denying rather than guessing."
 
 _plausible() { [ -n "$1" ] && [ -d "$1" ] && { [ -e "$1/.git" ] || [ -f "$1/docs/specs/role-handoff-contract.md" ]; }; }
-_under() {
-  [ -z "$2" ] && return 0
-  python3 -c '
-import os,posixpath,sys
-r,t=sys.argv[1],sys.argv[2]
-try: rr=posixpath.normpath(os.path.realpath(r).replace("\\","/"))
-except Exception: sys.exit(1)
-n=t.replace("\\","/"); a=n if posixpath.isabs(n) else posixpath.join(rr,n)
-a=posixpath.normpath(a); real=posixpath.normpath(os.path.realpath(a).replace("\\","/"))
-sys.exit(0 if (real==rr or real.startswith(rr+"/")) else 1)
-' "$1" "$2"
-}
 
 root=""
-if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && _plausible "$CLAUDE_PROJECT_DIR" && _under "$CLAUDE_PROJECT_DIR" "$_target"; then
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && _plausible "$CLAUDE_PROJECT_DIR"; then
   root="$(cd "$CLAUDE_PROJECT_DIR" 2>/dev/null && pwd -P)"
 fi
-if [ -z "$root" ]; then
-  d="$_target"; [ -n "$d" ] || d="$(pwd -P)"; [ -d "$d" ] || d="$(dirname "$d")"
-  root="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null || true)"
-fi
 [ -z "$root" ] && root="$(git -C "$(pwd -P)" rev-parse --show-toplevel 2>/dev/null || true)"
-[ -z "$root" ] && deny "no project root could be determined; failing closed (traceability check cannot run)."
+[ -z "$root" ] && gate_deny "$GATE_NAME" "no project root could be determined; failing closed (traceability check cannot run)."
 
 _branch="$(git -C "$root" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 
-TG_PAYLOAD="$payload" TG_ROOT="$root" TG_BRANCH="$_branch" \
+TG_PAYLOAD="$payload" TG_ROOT="$root" TG_BRANCH="$_branch" GATE_LIB_PY="$GATE_LIB_PY" \
 python3 <<'PY'
 import sys as _fc_sys  # fail-closed-on-internal-error
 try:
-    import json, os, posixpath, re, sys
+    import importlib.util, json, os, posixpath, re, sys
 
     def deny(m):
         sys.stderr.write("test-authoring: refused — %s\n" % m); sys.exit(2)
 
+    _spec = importlib.util.spec_from_file_location("gate_lib", os.environ["GATE_LIB_PY"])
+    gate_lib = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(gate_lib)
+
     raw = os.environ.get("TG_PAYLOAD", "")
-    try:
-        ev = json.loads(raw) if raw else {}
-    except ValueError:
-        deny("the tool-call payload is not valid JSON; the gate cannot judge traceability on an unparseable write.")
-    if not isinstance(ev, dict):
-        deny("the tool-call payload is not a JSON object; failing closed on traceability.")
+    ev = gate_lib.gate_parse_json_or_deny(raw, deny)
 
     tool = ev.get("tool_name")
     ti = ev.get("tool_input")
@@ -104,65 +75,33 @@ try:
     root = posixpath.normpath(os.environ["TG_ROOT"].replace("\\", "/"))
     RECORD_RE = re.compile(r'^docs/issue-([0-9]+)/reports/test-authoring\.md$')
 
-    def resolve(p):
-        n = p.replace("\\", "/")
-        a = n if posixpath.isabs(n) else posixpath.join(root, n)
-        a = posixpath.normpath(a)
-        try:
-            return posixpath.normpath(os.path.realpath(a).replace("\\", "/"))
-        except OSError:
-            return a
-
     path = None
-    if tool in ("Write", "Edit", "MultiEdit"):
-        p = ti.get("file_path")
+    if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        p = ti.get("file_path") or ti.get("notebook_path")
         if isinstance(p, str) and p:
             path = p
     if path is None:
         sys.exit(0)
 
-    r = resolve(path)
-    if not r.startswith(root + "/"):
+    rel = gate_lib.gate_normalize_path(root, path)
+    if rel is None:
         sys.exit(0)
-    rel = r[len(root):].lstrip("/")
     m = RECORD_RE.match(rel)
     if not m:
         sys.exit(0)  # not this gate's write surface
     issue_n = m.group(1)
 
+    fs_path = os.path.join(root, rel)
     current = None
-    if os.path.isfile(r):
+    if os.path.isfile(fs_path):
         try:
-            with open(r, encoding="utf-8-sig") as fh:
+            with open(fs_path, encoding="utf-8-sig") as fh:
                 current = fh.read(1 << 20)
         except OSError:
             deny("%s exists but cannot be read; failing closed on traceability." % rel)
 
-    new_text = None
-    if tool == "Write":
-        c = ti.get("content")
-        if isinstance(c, str):
-            new_text = c
-    elif tool == "Edit":
-        o, n = ti.get("old_string"), ti.get("new_string")
-        if isinstance(o, str) and isinstance(n, str) and current is not None and o in current:
-            new_text = current.replace(o, n, 1)
-    elif tool == "MultiEdit":
-        edits = ti.get("edits")
-        text = current
-        if isinstance(edits, list) and text is not None:
-            ok = True
-            for e in edits:
-                if not isinstance(e, dict):
-                    ok = False; break
-                o, n = e.get("old_string"), e.get("new_string")
-                if not isinstance(o, str) or not isinstance(n, str) or o not in text:
-                    ok = False; break
-                text = text.replace(o, n, 1)
-            if ok:
-                new_text = text
-
-    if new_text is None:
+    new_text, ok = gate_lib.gate_reconstruct_write(tool, ti, current)
+    if not ok:
         deny(
             "this write targets %s but the gate cannot determine the resulting content "
             "from the tool input (tool=%r). Write the full document with Write, or use an "

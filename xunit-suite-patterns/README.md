@@ -10,18 +10,24 @@ and a smell list drawn from Meszaros' test-smell catalog — or an explicit
 ## How it works
 
 - `hooks/suite-patterns-gate.sh` — `PreToolUse` gate (`Write|Edit|
-  MultiEdit`) on `docs/issue-<n>/reports/test-authoring.md`. Reconstructs
-  the resulting document content (full content for `Write`; applies
-  `old_string`/`new_string` for `Edit`/`MultiEdit`), then checks, via a
-  lower-cased `has_any(...)` substring-presence pattern, that the content
-  states a suite-architecture note, a fixture strategy, and a smell list
-  (or its "no smells found" escape valve). Fails closed on an
-  unparseable payload, an unreadable existing file, or an `Edit`/
-  `MultiEdit` whose `old_string` cannot be located in the current file
-  (resulting content indeterminate). Kill switch:
-  `XUNIT_SUITE_PATTERNS_GATE_OFF` (off-means-off; any non-empty value
-  other than `0|false|no|off` disables the gate, with a stderr warning on
-  an unrecognized value).
+  MultiEdit`) on `docs/issue-<n>/reports/test-authoring.md`, sourcing
+  `tokenmaxxxer-core`'s `core/hooks/lib/gate-lib.sh`/`gate-lib.py` (the
+  gate-house standard, core issue #72, reference only) for the trap,
+  kill switch, JSON parse, path normalize, and `Write`/`Edit`/`MultiEdit`/
+  `NotebookEdit` reconstruction. The suite-architecture check now requires
+  a pyramid-level word (unit/integration/e2e) and a test-level/pyramid
+  term on the same or an adjacent line, and the fixture-strategy check
+  requires the fresh-/shared-fixture phrase on its own line — both moved
+  off whole-document substring presence (issue-10). The smell-list check
+  (smell word near a digit or a named smell, or an explicit "no smells
+  found" escape valve) was already locally adjacent and is unchanged.
+  Fails closed on an unparseable payload, an unreadable existing file, or
+  a write whose resulting content cannot be determined. Kill switch:
+  `XUNIT_SUITE_PATTERNS_GATE_OFF` — only a recognized on-spelling
+  (`1`/`true`/`yes`/`on`) disables the gate; empty, a recognized
+  off-spelling, or any unrecognized value all keep it active (the
+  correctness fix: the pre-issue-10 version disabled on any unrecognized
+  value).
 - `hooks/hooks.json` — registers the gate under `PreToolUse`, scoped to
   `${CLAUDE_PLUGIN_ROOT}`.
 - `.claude-plugin/plugin.json` — plugin manifest (name, description with
@@ -30,9 +36,12 @@ and a smell list drawn from Meszaros' test-smell catalog — or an explicit
   test-smell reference checklist, for authors to consult while writing the
   suite-architecture record.
 - `tests/suite-patterns-gate-tests.sh` — real-subprocess allow/deny test
-  suite for the gate, following `run-gate-tests.sh`'s pattern (throwaway
-  git-init'd fixture, JSON `PreToolUse` payload on stdin, exit 0=allow /
-  2=deny).
+  suite for the gate (throwaway git-init'd fixture, JSON `PreToolUse`
+  payload on stdin, exit 0=allow / 2=deny), including the mandatory
+  `Edit`/`MultiEdit`-with-`replace_all`, malformed-JSON,
+  unrecognized-kill-switch-stays-active, and absolute/`./`-path cases,
+  plus adjacency-upgrade cases for the suite-architecture and
+  fixture-strategy checks.
 
 ## Scope of evidence
 

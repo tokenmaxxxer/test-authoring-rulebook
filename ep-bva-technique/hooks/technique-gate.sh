@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-__fc(){ rc=$?; if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then echo "fail-closed: gate aborted (rc=$rc)" >&2; exit 2; fi; }
-trap __fc EXIT
 # PreToolUse gate (Write|Edit|MultiEdit) — ep-bva-technique plugin.
 #
 # Target: docs/issue-<n>/reports/test-authoring.md (this role's phase-2
@@ -9,88 +7,68 @@ trap __fc EXIT
 # docs/issue-7/proposals/methodology-enforcement-machine.md §3.2/§3.3.2.
 #
 # Requires:
-#   1. A test-design-technique citation (EP/BVA family keyword) be present
-#      somewhere in the resulting record content.
-#   2. If the record's language makes a thoroughness claim (e.g.
-#      "comprehensive coverage"), a mutation-testing mention must also be
-#      present, or the write is denied (escalation).
+#   1. A test-design-technique citation (EP/BVA family keyword) appearing
+#      in the same line/bullet/heading as a test-case-shaped reference —
+#      not merely anywhere in the document.
+#   2. If the record's language makes a thoroughness claim, a mutation-
+#      testing mention must appear in the same paragraph backing that
+#      claim, or the write is denied (escalation).
 #
-# Fails closed when the resulting content of a Write/Edit/MultiEdit cannot
-# be determined, mirroring pricing/hooks/methodology-gate.sh.
+# Migrated to the gate-house standard (core issue #72): sources
+# core/hooks/lib/gate-lib.sh / loads gate-lib.py for the fail-closed trap,
+# kill-switch convention, JSON parse, path normalize and Write/Edit/
+# MultiEdit/NotebookEdit reconstruction primitives (issue-10).
 #
-# Kill switch: export EP_BVA_TECHNIQUE_GATE_OFF=1 (off-means-off; an
-# unrecognized non-empty value disables the gate and logs a warning,
-# mirroring freelunch.sh's off-means-off case statement).
+# Semantic upgrade (issue-10): both checks move from whole-document
+# substring presence to line/paragraph-adjacency — a citation or mutation
+# mention dropped anywhere in the file (a stray comment, an unrelated
+# paragraph, inside a quoted negative example) no longer satisfies either
+# requirement.
+#
+# Kill switch: export EP_BVA_TECHNIQUE_GATE_OFF=1 — only a recognized
+# on-spelling (1/true/yes/on, case-insensitive) disables the gate; empty,
+# a recognized off-spelling, or any unrecognized value all keep it
+# active (this is the correctness fix: the pre-issue-10 version disabled
+# on ANY unrecognized value).
+CORE_HOOKS_ROOT="${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks"
+. "$CORE_HOOKS_ROOT/lib/gate-lib.sh"
+gate_trap_fail_closed
 set -uo pipefail
 
-role="${CLAUDE_ROLE:-ep-bva-technique}"
-deny() { echo "${role}: refused — $1" >&2; exit 2; }
+GATE_NAME="ep-bva-technique"
 
-_off_raw="${EP_BVA_TECHNIQUE_GATE_OFF:-}"
-_off_norm="$(printf '%s' "$_off_raw" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-case "$_off_norm" in
-  ""|0|false|no|off) ;;
-  1|true|yes|on) exit 0 ;;
-  *) echo "${role}: unrecognized EP_BVA_TECHNIQUE_GATE_OFF value '${_off_raw}' — treating as OFF (off-means-off)" >&2; exit 0 ;;
-esac
-
-command -v python3 >/dev/null 2>&1 || deny "technique-gate.sh requires python3, which is not on PATH; denying rather than guessing."
-
+# Drain stdin unconditionally first, so an early kill-switch exit never
+# leaves the caller's write end of the pipe blocked/SIGPIPEd.
 payload="$(cat 2>/dev/null || true)"
-[ -n "$payload" ] || deny "technique-gate: empty tool-use payload on stdin; cannot evaluate the technique gate."
 
-_target="$(printf '%s' "$payload" | python3 -c '
-import json,sys
-try: e=json.loads(sys.stdin.read())
-except Exception: sys.exit(0)
-ti=e.get("tool_input") if isinstance(e,dict) else None
-if isinstance(ti,dict):
-    for k in ("file_path","notebook_path"):
-        v=ti.get(k)
-        if isinstance(v,str) and v: print(v); break
-' 2>/dev/null || true)"
+gate_kill_switch_active "${EP_BVA_TECHNIQUE_GATE_OFF:-}" || { trap - EXIT; exit 0; }
+
+command -v python3 >/dev/null 2>&1 || gate_deny "$GATE_NAME" "technique-gate.sh requires python3, which is not on PATH; denying rather than guessing."
 
 _plausible() { [ -n "$1" ] && [ -d "$1" ] && { [ -e "$1/.git" ] || [ -f "$1/docs/specs/role-handoff-contract.md" ]; }; }
-_under() {
-  [ -z "$2" ] && return 0
-  python3 -c '
-import os,posixpath,sys
-r,t=sys.argv[1],sys.argv[2]
-try: rr=posixpath.normpath(os.path.realpath(r).replace("\\","/"))
-except Exception: sys.exit(1)
-n=t.replace("\\","/"); a=n if posixpath.isabs(n) else posixpath.join(rr,n)
-a=posixpath.normpath(a); real=posixpath.normpath(os.path.realpath(a).replace("\\","/"))
-sys.exit(0 if (real==rr or real.startswith(rr+"/")) else 1)
-' "$1" "$2"
-}
 
 root=""
-if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && _plausible "$CLAUDE_PROJECT_DIR" && _under "$CLAUDE_PROJECT_DIR" "$_target"; then
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && _plausible "$CLAUDE_PROJECT_DIR"; then
   root="$(cd "$CLAUDE_PROJECT_DIR" 2>/dev/null && pwd -P)"
 fi
-if [ -z "$root" ]; then
-  d="$_target"; [ -n "$d" ] || d="$(pwd -P)"; [ -d "$d" ] || d="$(dirname "$d")"
-  root="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null || true)"
-fi
 [ -z "$root" ] && root="$(git -C "$(pwd -P)" rev-parse --show-toplevel 2>/dev/null || true)"
-[ -z "$root" ] && deny "no project root could be determined; failing closed (technique check cannot run)."
+[ -z "$root" ] && gate_deny "$GATE_NAME" "no project root could be determined; failing closed (technique check cannot run)."
 
-TG_PAYLOAD="$payload" TG_ROOT="$root" \
+TG_PAYLOAD="$payload" TG_ROOT="$root" GATE_LIB_PY="$GATE_LIB_PY" \
 python3 <<'PY'
 import sys as _fc_sys  # fail-closed-on-internal-error
 try:
-    import json, os, posixpath, re, sys
+    import importlib.util, json, os, posixpath, re, sys
 
     def deny(m):
         sys.stderr.write("ep-bva-technique: refused — %s\n" % m); sys.exit(2)
 
+    _spec = importlib.util.spec_from_file_location("gate_lib", os.environ["GATE_LIB_PY"])
+    gate_lib = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(gate_lib)
+
     raw = os.environ.get("TG_PAYLOAD", "")
-    try:
-        ev = json.loads(raw) if raw else {}
-    except ValueError:
-        deny("the tool-call payload is not valid JSON; the gate cannot judge technique fields on an unparseable write.")
-    if not isinstance(ev, dict):
-        deny("the tool-call payload is not a JSON object; failing closed on technique gate.")
+    ev = gate_lib.gate_parse_json_or_deny(raw, deny)
 
     tool = ev.get("tool_name")
     ti = ev.get("tool_input")
@@ -100,63 +78,29 @@ try:
     root = posixpath.normpath(os.environ["TG_ROOT"].replace("\\", "/"))
     RECORD_RE = re.compile(r'^docs/issue-[0-9]+/reports/test-authoring\.md$')
 
-    def resolve(p):
-        n = p.replace("\\", "/")
-        a = n if posixpath.isabs(n) else posixpath.join(root, n)
-        a = posixpath.normpath(a)
-        try:
-            return posixpath.normpath(os.path.realpath(a).replace("\\", "/"))
-        except OSError:
-            return a
-
     path = None
-    if tool in ("Write", "Edit", "MultiEdit"):
-        p = ti.get("file_path")
+    if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        p = ti.get("file_path") or ti.get("notebook_path")
         if isinstance(p, str) and p:
             path = p
     if path is None:
         sys.exit(0)
 
-    r = resolve(path)
-    if not r.startswith(root + "/"):
-        sys.exit(0)
-    rel = r[len(root):].lstrip("/")
-    if not RECORD_RE.match(rel):
+    rel = gate_lib.gate_normalize_path(root, path)
+    if rel is None or not RECORD_RE.match(rel):
         sys.exit(0)  # not the test-authoring phase-2 record — not this gate's business
 
+    fs_path = os.path.join(root, rel)
     current = None
-    if os.path.isfile(r):
+    if os.path.isfile(fs_path):
         try:
-            with open(r, encoding="utf-8-sig") as fh:
+            with open(fs_path, encoding="utf-8-sig") as fh:
                 current = fh.read(1 << 20)
         except OSError:
             deny("%s exists but cannot be read; failing closed on technique gate." % rel)
 
-    new_text = None
-    if tool == "Write":
-        c = ti.get("content")
-        if isinstance(c, str):
-            new_text = c
-    elif tool == "Edit":
-        o, n = ti.get("old_string"), ti.get("new_string")
-        if isinstance(o, str) and isinstance(n, str) and current is not None and o in current:
-            new_text = current.replace(o, n, 1)
-    elif tool == "MultiEdit":
-        edits = ti.get("edits")
-        text = current
-        if isinstance(edits, list) and text is not None:
-            ok = True
-            for e in edits:
-                if not isinstance(e, dict):
-                    ok = False; break
-                o, n = e.get("old_string"), e.get("new_string")
-                if not isinstance(o, str) or not isinstance(n, str) or o not in text:
-                    ok = False; break
-                text = text.replace(o, n, 1)
-            if ok:
-                new_text = text
-
-    if new_text is None:
+    new_text, ok = gate_lib.gate_reconstruct_write(tool, ti, current)
+    if not ok:
         deny(
             "this write targets %s but the gate cannot determine the resulting content "
             "from the tool input (tool=%r). Write the full document with Write, or use an "
@@ -164,37 +108,47 @@ try:
             "checked." % (rel, tool)
         )
 
-    low = new_text.lower()
+    TECHNIQUE_RE = re.compile(
+        r'equivalence partitioning|ep/bva|boundary value|ep-bva|boundary case', re.I
+    )
 
-    def has_any(*needles):
-        return any(nd in low for nd in needles)
+    def has_test_id(paragraph):
+        if any(re.match(r'^#{1,6}\s', l) or re.match(r'^\s*[-*]\s', l)
+               for l in paragraph.splitlines()):
+            return True
+        return bool(re.search(r'\btest[_a-zA-Z0-9]*\b', paragraph, re.I))
+
+    THOROUGH_RE = re.compile(
+        r'thorough|comprehensive coverage|fully covers|exhaustive', re.I
+    )
+    MUTATION_RE = re.compile(r'mutation test|mutation testing|mutant', re.I)
+
+    # 1. Technique named within the same paragraph as a test-case-shaped
+    #    reference (a heading, a bullet, or a test-prefixed token) — a
+    #    citation dropped in an unrelated paragraph no longer qualifies.
+    paragraphs = re.split(r'\n\s*\n', new_text)
+    technique_named = any(
+        TECHNIQUE_RE.search(p) and has_test_id(p) for p in paragraphs
+    )
 
     missing = []
-
-    # 1. Technique named — EP/BVA family keyword.
-    technique_named = has_any(
-        "equivalence partitioning", "ep/bva", "boundary value", "ep-bva",
-        "boundary case",
-    )
     if not technique_named:
-        missing.append("technique-named")
+        missing.append("technique-named (must share a paragraph/line with a test-case reference — heading, bullet, or test-prefixed token — not merely appear anywhere in the document)")
 
-    # 2. Thoroughness-claim escalation: if a thoroughness claim is made,
-    #    a mutation-testing mention must also be present.
-    thoroughness_claim = has_any(
-        "thorough", "comprehensive coverage", "fully covers", "exhaustive",
-    )
-    mutation_mentioned = has_any("mutation test", "mutation testing", "mutant")
-    if thoroughness_claim and not mutation_mentioned:
-        missing.append("mutation-testing-mention (thoroughness claim made)")
+    # 2. Thoroughness-claim escalation: mutation-testing mention must be
+    #    in the same paragraph as the thoroughness claim.
+    thorough_paragraphs = [p for p in paragraphs if THOROUGH_RE.search(p)]
+    if thorough_paragraphs and not any(MUTATION_RE.search(p) for p in thorough_paragraphs):
+        missing.append("mutation-testing-mention (thoroughness claim made without a mutation-testing mention in the same paragraph)")
 
     if missing:
         deny(
             "test-authoring record is missing required element(s): %s. Per "
             "docs/issue-7/proposals/methodology-enforcement-machine.md §3.3.2, every "
-            "phase-2 record must cite an EP/BVA test-design technique, and any "
-            "thoroughness claim (comprehensive/exhaustive/fully covers/thorough) must "
-            "be backed by a mutation-testing mention." % ", ".join(missing)
+            "phase-2 record must cite an EP/BVA test-design technique adjacent to an "
+            "actual test-case reference, and any thoroughness claim (comprehensive/"
+            "exhaustive/fully covers/thorough) must be backed by a mutation-testing "
+            "mention in the same paragraph." % ", ".join(missing)
         )
 
     sys.exit(0)

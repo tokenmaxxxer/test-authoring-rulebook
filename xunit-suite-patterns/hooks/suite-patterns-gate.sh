@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-__fc(){ rc=$?; if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then echo "fail-closed: gate aborted (rc=$rc)" >&2; exit 2; fi; }
-trap __fc EXIT
 # PreToolUse gate (Write|Edit|MultiEdit) — xunit-suite-patterns plugin,
 # gates test-authoring's phase-2 record for the three Meszaros xUnit Test
 # Patterns components this plugin owns (issue-1(b) items 1-3): a suite-
@@ -8,86 +6,62 @@ trap __fc EXIT
 #
 # Target: docs/issue-<n>/reports/test-authoring.md (any issue number).
 #
-# Follows pricing/hooks/methodology-gate.sh's has_any(...) keyword-presence
-# pattern on the reconstructed resulting content, fail-closed when the
-# resulting content cannot be determined.
+# Migrated to the gate-house standard (core issue #72): sources
+# core/hooks/lib/gate-lib.sh / loads gate-lib.py for the fail-closed trap,
+# kill-switch convention, JSON parse, path normalize and Write/Edit/
+# MultiEdit/NotebookEdit reconstruction primitives (issue-10).
 #
-# Kill switch: export XUNIT_SUITE_PATTERNS_GATE_OFF=1
+# Semantic upgrade (issue-10): the pyramid-level/pyramid-term check and
+# the fixture-strategy check move from whole-document has_any(...) to
+# same-line-or-adjacent-line pairing (pyramid level word and pyramid term
+# within the same bullet/line; fixture-strategy phrase as its own line).
+# The smell-list check already required local adjacency (smell word near
+# a digit or named smell) and is unchanged.
+#
+# Kill switch: export XUNIT_SUITE_PATTERNS_GATE_OFF=1 — only a recognized
+# on-spelling (1/true/yes/on, case-insensitive) disables the gate; empty,
+# a recognized off-spelling, or any unrecognized value all keep it active
+# (this is the correctness fix: the pre-issue-10 version disabled on ANY
+# unrecognized value).
+CORE_HOOKS_ROOT="${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks"
+. "$CORE_HOOKS_ROOT/lib/gate-lib.sh"
+gate_trap_fail_closed
 set -uo pipefail
 
-role="xunit-suite-patterns"
-deny() { echo "${role}: refused — $1" >&2; exit 2; }
+GATE_NAME="xunit-suite-patterns"
 
-# Off means off: any non-empty value other than the recognized "not off"
-# spellings disables the gate; an unrecognized non-empty value still counts
-# as off but warns on stderr, per freelunch.sh's off-means-off pattern —
-# here a stuck-open methodology gate is the safer failure to avoid, so an
-# unrecognized value is not silently treated as "keep the gate on" either;
-# it is honored as off, with a warning.
-_off_raw="${XUNIT_SUITE_PATTERNS_GATE_OFF:-}"
-_off_norm="$(printf '%s' "$_off_raw" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-case "$_off_norm" in
-  ""|0|false|no|off) ;;
-  *) echo "${role}: XUNIT_SUITE_PATTERNS_GATE_OFF='${_off_raw}' set — gate disabled" >&2; cat >/dev/null 2>&1; exit 0 ;;
-esac
-
-command -v python3 >/dev/null 2>&1 || deny "suite-patterns-gate.sh requires python3, which is not on PATH; denying rather than guessing."
-
+# Drain stdin unconditionally first, so an early kill-switch exit never
+# leaves the caller's write end of the pipe blocked/SIGPIPEd.
 payload="$(cat 2>/dev/null || true)"
-[ -n "$payload" ] || deny "empty tool-use payload on stdin; cannot evaluate the suite-patterns gate."
 
-_target="$(printf '%s' "$payload" | python3 -c '
-import json,sys
-try: e=json.loads(sys.stdin.read())
-except Exception: sys.exit(0)
-ti=e.get("tool_input") if isinstance(e,dict) else None
-if isinstance(ti,dict):
-    for k in ("file_path","notebook_path"):
-        v=ti.get(k)
-        if isinstance(v,str) and v: print(v); break
-' 2>/dev/null || true)"
+gate_kill_switch_active "${XUNIT_SUITE_PATTERNS_GATE_OFF:-}" || { trap - EXIT; exit 0; }
+
+command -v python3 >/dev/null 2>&1 || gate_deny "$GATE_NAME" "suite-patterns-gate.sh requires python3, which is not on PATH; denying rather than guessing."
 
 _plausible() { [ -n "$1" ] && [ -d "$1" ] && { [ -e "$1/.git" ] || [ -f "$1/docs/specs/role-handoff-contract.md" ]; }; }
-_under() {
-  [ -z "$2" ] && return 0
-  python3 -c '
-import os,posixpath,sys
-r,t=sys.argv[1],sys.argv[2]
-try: rr=posixpath.normpath(os.path.realpath(r).replace("\\","/"))
-except Exception: sys.exit(1)
-n=t.replace("\\","/"); a=n if posixpath.isabs(n) else posixpath.join(rr,n)
-a=posixpath.normpath(a); real=posixpath.normpath(os.path.realpath(a).replace("\\","/"))
-sys.exit(0 if (real==rr or real.startswith(rr+"/")) else 1)
-' "$1" "$2"
-}
 
 root=""
-if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && _plausible "$CLAUDE_PROJECT_DIR" && _under "$CLAUDE_PROJECT_DIR" "$_target"; then
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && _plausible "$CLAUDE_PROJECT_DIR"; then
   root="$(cd "$CLAUDE_PROJECT_DIR" 2>/dev/null && pwd -P)"
 fi
-if [ -z "$root" ]; then
-  d="$_target"; [ -n "$d" ] || d="$(pwd -P)"; [ -d "$d" ] || d="$(dirname "$d")"
-  root="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null || true)"
-fi
 [ -z "$root" ] && root="$(git -C "$(pwd -P)" rev-parse --show-toplevel 2>/dev/null || true)"
-[ -z "$root" ] && deny "no project root could be determined; failing closed (suite-patterns check cannot run)."
+[ -z "$root" ] && gate_deny "$GATE_NAME" "no project root could be determined; failing closed (suite-patterns check cannot run)."
 
-SPG_PAYLOAD="$payload" SPG_ROOT="$root" \
+SPG_PAYLOAD="$payload" SPG_ROOT="$root" GATE_LIB_PY="$GATE_LIB_PY" \
 python3 <<'PY'
 import sys as _fc_sys  # fail-closed-on-internal-error
 try:
-    import json, os, posixpath, re, sys
+    import importlib.util, json, os, posixpath, re, sys
 
     def deny(m):
         sys.stderr.write("xunit-suite-patterns: refused — %s\n" % m); sys.exit(2)
 
+    _spec = importlib.util.spec_from_file_location("gate_lib", os.environ["GATE_LIB_PY"])
+    gate_lib = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(gate_lib)
+
     raw = os.environ.get("SPG_PAYLOAD", "")
-    try:
-        ev = json.loads(raw) if raw else {}
-    except ValueError:
-        deny("the tool-call payload is not valid JSON; the gate cannot judge suite-pattern fields on an unparseable write.")
-    if not isinstance(ev, dict):
-        deny("the tool-call payload is not a JSON object; failing closed on suite-patterns.")
+    ev = gate_lib.gate_parse_json_or_deny(raw, deny)
 
     tool = ev.get("tool_name")
     ti = ev.get("tool_input")
@@ -97,63 +71,29 @@ try:
     root = posixpath.normpath(os.environ["SPG_ROOT"].replace("\\", "/"))
     RECORD_RE = re.compile(r'^docs/issue-[0-9]+/reports/test-authoring\.md$')
 
-    def resolve(p):
-        n = p.replace("\\", "/")
-        a = n if posixpath.isabs(n) else posixpath.join(root, n)
-        a = posixpath.normpath(a)
-        try:
-            return posixpath.normpath(os.path.realpath(a).replace("\\", "/"))
-        except OSError:
-            return a
-
     path = None
-    if tool in ("Write", "Edit", "MultiEdit"):
-        p = ti.get("file_path")
+    if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        p = ti.get("file_path") or ti.get("notebook_path")
         if isinstance(p, str) and p:
             path = p
     if path is None:
         sys.exit(0)
 
-    r = resolve(path)
-    if not r.startswith(root + "/"):
-        sys.exit(0)
-    rel = r[len(root):].lstrip("/")
-    if not RECORD_RE.match(rel):
+    rel = gate_lib.gate_normalize_path(root, path)
+    if rel is None or not RECORD_RE.match(rel):
         sys.exit(0)  # not this plugin's write surface
 
+    fs_path = os.path.join(root, rel)
     current = None
-    if os.path.isfile(r):
+    if os.path.isfile(fs_path):
         try:
-            with open(r, encoding="utf-8-sig") as fh:
+            with open(fs_path, encoding="utf-8-sig") as fh:
                 current = fh.read(1 << 20)
         except OSError:
             deny("%s exists but cannot be read; failing closed on suite-patterns." % rel)
 
-    new_text = None
-    if tool == "Write":
-        c = ti.get("content")
-        if isinstance(c, str):
-            new_text = c
-    elif tool == "Edit":
-        o, n = ti.get("old_string"), ti.get("new_string")
-        if isinstance(o, str) and isinstance(n, str) and current is not None and o in current:
-            new_text = current.replace(o, n, 1)
-    elif tool == "MultiEdit":
-        edits = ti.get("edits")
-        text = current
-        if isinstance(edits, list) and text is not None:
-            ok = True
-            for e in edits:
-                if not isinstance(e, dict):
-                    ok = False; break
-                o, n = e.get("old_string"), e.get("new_string")
-                if not isinstance(o, str) or not isinstance(n, str) or o not in text:
-                    ok = False; break
-                text = text.replace(o, n, 1)
-            if ok:
-                new_text = text
-
-    if new_text is None:
+    new_text, ok = gate_lib.gate_reconstruct_write(tool, ti, current)
+    if not ok:
         deny(
             "this write targets %s but the gate cannot determine the resulting content "
             "from the tool input (tool=%r). Write the full document with Write, or use an "
@@ -168,21 +108,37 @@ try:
 
     missing = []
 
-    # 1. Suite architecture note: at least one pyramid-level word AND a
-    #    test-level/pyramid term.
-    pyramid_level = has_any("unit", "integration", "e2e")
-    pyramid_term = has_any("test-level", "test level", "pyramid")
-    if not (pyramid_level and pyramid_term):
-        missing.append("suite-architecture-note")
+    # 1. Suite architecture note: a pyramid-level word AND a test-level/
+    #    pyramid term, adjacent — same line/bullet, or within 1 line of
+    #    each other.
+    PYRAMID_LEVEL_RE = re.compile(r'\b(unit|integration|e2e)\b', re.I)
+    PYRAMID_TERM_RE = re.compile(r'test-level|test level|pyramid', re.I)
+    lines = new_text.splitlines()
+    level_lines = [i for i, l in enumerate(lines) if PYRAMID_LEVEL_RE.search(l)]
+    term_lines = [i for i, l in enumerate(lines) if PYRAMID_TERM_RE.search(l)]
+    arch_note = any(abs(i - j) <= 1 for i in level_lines for j in term_lines)
+    if not arch_note:
+        missing.append("suite-architecture-note (pyramid-level word and test-level/pyramid term must appear on the same or an adjacent line)")
 
-    # 2. Fixture strategy: fresh-fixture or shared-fixture, Meszaros' exact
-    #    terms.
-    if not has_any("fresh fixture", "shared fixture", "fresh-fixture", "shared-fixture"):
-        missing.append("fixture-strategy")
+    # 2. Fixture strategy: fresh-fixture or shared-fixture, as its own
+    #    line (Meszaros' exact terms), not merely present in the document.
+    FIXTURE_RE = re.compile(r'fresh[\s-]fixture|shared[\s-]fixture', re.I)
+
+    def fixture_stated_directly(text):
+        # "as its own line": the phrase's own clause (bounded by '.'/';'
+        # or the line itself) is short — a direct statement, not a
+        # fixture-word citation buried deep inside an unrelated sentence.
+        for l in text.splitlines():
+            for clause in re.split(r'[.;]', l):
+                if FIXTURE_RE.search(clause) and len(clause.split()) <= 10:
+                    return True
+        return False
+
+    if not fixture_stated_directly(new_text):
+        missing.append("fixture-strategy (fresh-fixture/shared-fixture phrase must appear on its own line, not buried inside an unrelated sentence)")
 
     # 3. Smell list: "smell" combined with a digit or a known Meszaros smell
-    #    name, OR an explicit "no smells found" escape valve (exited_early-
-    #    style), mirroring pricing gate's exited_early pattern.
+    #    name, OR an explicit "no smells found" escape valve.
     smell_names = (
         "fixture setup", "general fixture", "test code duplication",
         "conditional test logic", "mystery guest", "resource optimism",
@@ -198,10 +154,10 @@ try:
         deny(
             "test-authoring phase-2 record is missing required xunit-suite-patterns "
             "element(s): %s. Per issue-1(b) items 1-3 (Meszaros xUnit Test Patterns), "
-            "the record must name a pyramid-level (unit/integration/e2e) alongside a "
-            "test-level/pyramid term, state a fresh-fixture or shared-fixture strategy, "
-            "and either name a real smell from the catalog (with a digit or a known "
-            "smell name) or explicitly state no smells were found." % ", ".join(missing)
+            "the record must name a pyramid-level (unit/integration/e2e) adjacent to a "
+            "test-level/pyramid term, state a fresh-fixture or shared-fixture strategy "
+            "on its own line, and either name a real smell from the catalog (with a "
+            "digit or a known smell name) or explicitly state no smells were found." % ", ".join(missing)
         )
 
     sys.exit(0)

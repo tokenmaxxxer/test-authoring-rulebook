@@ -14,20 +14,26 @@ exist on disk before the proposal is allowed to land.
 - `hooks/hooks.json` — registers `hooks/proposal-shape-gate.sh` on
   `PreToolUse` for `Write|Edit|MultiEdit`, scoped to
   `${CLAUDE_PLUGIN_ROOT}`.
-- `hooks/proposal-shape-gate.sh` — the gate itself. Fail-closed
-  (`trap __fc EXIT`, denies on any non-{0,2} exit), reconstructs the
-  resulting file content for `Write`/`Edit`/`MultiEdit` calls the same
-  way `pricing/hooks/methodology-gate.sh` does, and denies (exit 2) when
-  the resulting content is indeterminate rather than guessing. Checks the
-  six required section headers and the `Sources:` line via lower-cased
-  substring presence (`has_any`), and separately denies when the matching
-  `survey.md` for that issue number is missing from disk. Kill switch:
-  `ADR_PROPOSAL_SHAPE_GATE_OFF` (off-means-off case statement, mirroring
-  `freelunch/hooks/freelunch.sh`).
+- `hooks/proposal-shape-gate.sh` — the gate itself. Sources
+  `tokenmaxxxer-core`'s `core/hooks/lib/gate-lib.sh` (fail-closed trap,
+  kill switch) and loads `gate-lib.py` (JSON parse, path normalize,
+  `Write`/`Edit`/`MultiEdit`/`NotebookEdit` reconstruction) — the
+  gate-house standard, core issue #72, reference only, never vendored —
+  and denies (exit 2) when the resulting content is indeterminate rather
+  than guessing. Checks each of the six required section headers as a
+  markdown heading line (`^#{1,3}\s+...`), not merely present in prose,
+  plus a lower-cased substring check for the `Sources:` line, and
+  separately denies when the matching `survey.md` for that issue number
+  is missing from disk. Kill switch: `ADR_PROPOSAL_SHAPE_GATE_OFF` — only
+  a recognized on-spelling (`1`/`true`/`yes`/`on`) disables the gate;
+  empty, a recognized off-spelling, or any unrecognized value all keep it
+  active.
 - `tests/proposal-shape-gate-tests.sh` — runs the gate as a real bash
-  subprocess against a throwaway git-init'd fixture directory for each of
-  the 8 enumerated test cases, asserting exit 0 (allow) / exit 2 (deny),
-  and prints an aggregate pass/fail count.
+  subprocess against a throwaway git-init'd fixture directory, asserting
+  exit 0 (allow) / exit 2 (deny), including the mandatory `Edit`/
+  `MultiEdit`-with-`replace_all`, malformed-JSON, unrecognized-kill-switch-
+  stays-active, and absolute/`./`-path cases, plus a heading-vs-prose
+  semantic-upgrade case, and prints an aggregate pass/fail count.
 
 ## Scope of evidence
 

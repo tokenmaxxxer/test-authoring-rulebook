@@ -17,20 +17,27 @@ one — it looks traced but points at the wrong requirement.
 - `hooks/hooks.json` — registers `hooks/traceability-gate.sh` under
   `PreToolUse` for `Write|Edit|MultiEdit`, scoped to
   `${CLAUDE_PLUGIN_ROOT}`.
-- `hooks/traceability-gate.sh` — fail-closed `PreToolUse` gate. Fires only
-  on writes to `docs/issue-<n>/reports/test-authoring.md`. Reconstructs the
-  resulting content for `Write`/`Edit`/`MultiEdit` and denies (exit 2) when:
-  (a) no traceability-keyword line is present at all, or (b) a
-  traceability line is present but cites an issue number that does not
-  match the issue number in the current git branch name
-  (`issue-<n>/...`). Fails closed (denies) whenever the resulting content
-  cannot be determined, or when no project root can be resolved. Kill
-  switch: `TRACEABILITY_LINE_GATE_OFF` (off-means-off; only
-  `""|0|false|no|off` count as not-off, any other non-empty value
-  disables the gate, with a warning on unrecognized values).
+- `hooks/traceability-gate.sh` — fail-closed `PreToolUse` gate, sourcing
+  `tokenmaxxxer-core`'s `core/hooks/lib/gate-lib.sh`/`gate-lib.py` (the
+  gate-house standard, core issue #72, reference only) for the trap,
+  kill switch, JSON parse, path normalize, and `Write`/`Edit`/`MultiEdit`/
+  `NotebookEdit` reconstruction. Fires only on writes to
+  `docs/issue-<n>/reports/test-authoring.md`. Denies (exit 2) when: (a) no
+  traceability-keyword line is present at all, or (b) a traceability line
+  is present but cites an issue number that does not match the issue
+  number in the current git branch name (`issue-<n>/...`). Already
+  line-scoped (not substring theater), so issue-10's semantic upgrade
+  requirement applies no change here beyond the gate-lib migration. Kill
+  switch: `TRACEABILITY_LINE_GATE_OFF` — only a recognized on-spelling
+  (`1`/`true`/`yes`/`on`) disables the gate; empty, a recognized
+  off-spelling, or any unrecognized value all keep it active (the
+  correctness fix: the pre-issue-10 version disabled on any unrecognized
+  value).
 - `tests/traceability-gate-tests.sh` — real-bash-subprocess allow/deny
   test cases exercising the gate against a throwaway git-init'd fixture,
-  per proposal §3.3.3's four enumerated cases.
+  including the mandatory `Edit`/`MultiEdit`-with-`replace_all`,
+  malformed-JSON, unrecognized-kill-switch-stays-active, and
+  absolute/`./`-path cases.
 
 ## Scope of evidence
 
