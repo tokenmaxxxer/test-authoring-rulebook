@@ -1,8 +1,7 @@
 # test-authoring-rulebook
 
 Rulebook for the `test-authoring` role (contract v3 role-handoff protocol), split off
-per `docs/issue-160/proposals/role-taxonomy.md`'s round-4 promotion and
-generated as skeleton scaffolding by issue-167.
+per `docs/issue-160/proposals/role-taxonomy.md`'s round-4 promotion.
 
 - **decides**: 테스트 코드 자체가 격리성·fixture 전략 면에서 좋은 설계인가
 - **use_when**: 신규/기존 테스트 스위트를 설계·리뷰할 때
@@ -39,7 +38,3 @@ claude plugin install freelunch
   harness resolving `CLAUDE_PLUGIN_ROOT_CORE` and aggregating each
   plugin's gate test suite
 - `docs/specs/approvers.md` — Approve-authority allowlist (see below)
-
-This is scaffolding, not a finished rulebook: fill in doctrine detail,
-handoff enforcement, and any role-specific progress gate before treating
-it as load-bearing.
