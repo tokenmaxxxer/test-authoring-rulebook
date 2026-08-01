@@ -196,5 +196,24 @@ case_abs_and_dot_path() {
 }
 case_abs_and_dot_path
 
+# Mandatory group (issue-75/issue-13): CLAUDE_PLUGIN_ROOT_CORE pointed
+# nowhere resolvable -> the guarded gate-lib.sh source must deny (exit 2),
+# never silently allow.
+case_missing_core() {
+  local td; td="$(cd "$(mktemp -d)" && pwd -P)"
+  git init -q "$td"
+  mkdir -p "$td/docs/issue-9/proposals" "$td/docs/issue-9/reports/test-authoring"
+  printf 'survey' > "$td/docs/issue-9/reports/test-authoring/survey.md"
+  local body rc got
+  body="$(python3 -c 'import json,sys; print(json.dumps({"tool_name":"Write","tool_input":{"file_path":sys.argv[1],"content":sys.argv[2]}}))' "docs/issue-9/proposals/foo.md" "$GOOD")"
+  printf '%s' "$body" | env CLAUDE_PROJECT_DIR="$td" CLAUDE_PLUGIN_ROOT_CORE="$td/no-such-core" \
+    /bin/bash "$HOOKS/proposal-shape-gate.sh" >/dev/null 2>&1
+  rc=$?
+  case "$rc" in 0) got=allow ;; 2) got=deny ;; *) got="exit-$rc" ;; esac
+  rm -rf "$td"
+  report deny "$got" case-deny-missing-core-CLAUDE_PLUGIN_ROOT_CORE
+}
+case_missing_core
+
 printf '\n== %d passed, %d failed ==\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

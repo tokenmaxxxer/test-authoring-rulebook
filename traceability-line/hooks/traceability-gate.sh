@@ -26,7 +26,7 @@
 # on-spelling (1/true/yes/on, case-insensitive) disables the gate; empty,
 # a recognized off-spelling, or any unrecognized value all keep it active.
 CORE_HOOKS_ROOT="${CLAUDE_PLUGIN_ROOT_CORE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../core" && pwd -P)}/hooks"
-. "$CORE_HOOKS_ROOT/lib/gate-lib.sh"
+. "$CORE_HOOKS_ROOT/lib/gate-lib.sh" || { echo "traceability-gate.sh: cannot source gate-lib.sh" >&2; exit 2; }
 gate_trap_fail_closed
 set -uo pipefail
 
