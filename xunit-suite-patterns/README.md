@@ -7,6 +7,10 @@ test-pyramid level, a stated fixture strategy (fresh vs. shared fixture),
 and a smell list drawn from Meszaros' test-smell catalog — or an explicit
 "no smells found" exit when the suite genuinely has none.
 
+The suite-architecture note is this plugin's home for
+`test-authoring.spec.json`'s `test_items` field (issue-19); see
+`test-authoring/README.md`'s spec field mapping.
+
 ## How it works
 
 - `hooks/suite-patterns-gate.sh` — `PreToolUse` gate (`Write|Edit|

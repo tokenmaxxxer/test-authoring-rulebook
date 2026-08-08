@@ -8,6 +8,10 @@ claims thoroughness — a claim of "comprehensive coverage" is not evidence
 of it, and this plugin is the one place that distinction is enforced
 mechanically rather than left to reviewer judgment.
 
+This EP/BVA citation is this plugin's home for
+`test-authoring.spec.json`'s `input_spec` field (issue-19); see
+`test-authoring/README.md`'s spec field mapping.
+
 ## How it works
 
 - `hooks/hooks.json` — registers `hooks/technique-gate.sh` under

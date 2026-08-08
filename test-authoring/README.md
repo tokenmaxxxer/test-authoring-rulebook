@@ -67,3 +67,50 @@ plugins, matched on `Write|Edit|MultiEdit`. `gate_bash_write_targets`
 (gate-lib.sh) stays unadopted here — none of the four real gates need
 `Bash`-write detection (their write surfaces are role-authored markdown
 under `docs/`, not shell-command targets).
+
+## Spec field mapping (issue-19)
+
+`roles/specs/test-authoring.spec.json` (marketplace on-the-record) names
+five required deliverable fields and a `loop_state` vocabulary. This
+rulebook's existing phase-2 components already cover most of them; this
+section makes that mapping explicit rather than leaving it implicit.
+
+- `test_id` → the existing traceability line (`traceability-line`
+  plugin). `test_id`'s reference-resolution check (must resolve to a real
+  test file, no orphans) is `on-the-record`'s own hook, not duplicated
+  here.
+- `test_items` → the existing suite-architecture note (test-level
+  classification / scope description; also cross-referenced from
+  `xunit-suite-patterns/README.md`).
+- `input_spec` → the existing EP/BVA technique citation
+  (`ep-bva-technique` plugin; also cross-referenced from
+  `ep-bva-technique/README.md`) — equivalence partitioning and
+  boundary-value analysis are input-domain specification techniques.
+- `output_spec` → a new, currently gate-less phase-2 record item: each
+  nontrivial test case states its expected output alongside its
+  EP/BVA-cited input. Empty state (issue-19 acceptance rule): the spec's
+  `recomputation` rule (`output_spec` is re-run, never asserted
+  standalone) is out of scope here — the spec itself marks its
+  `checked_by` as `TBD`, so no gate enforces this field yet; it is
+  documented expectation only.
+- `environment` → an optional phase-2 record item (environmental/runtime
+  needs for running the suite), documented only — no gate, matching the
+  spec's `required: false`.
+
+`loop_state` vocabulary: `drafting`, `items-undeclared`, `landed`,
+`running`, `test-unreachable` (progress: `drafting`, `running`;
+terminal: `landed`; refusal: `items-undeclared`; error:
+`test-unreachable`). This vocabulary is declared here directly rather
+than via `docs/specs/record-fields-terminal-states.json`:
+`tokenmaxxxer-core`'s `record-fields-gate.sh` validates every key in
+that override file against role-handoff-contract v3 §2's fixed kind
+list (`coding-record`, `feasibility-record`, `ops-record`,
+`product-record`, `qa-record`, `reflect-record`, `review-record`,
+`ux-design-record`, `verify-record`) and denies the write — for any
+record in the repo, not only test-authoring's — the moment an
+unrecognized kind like `test-authoring-record` appears as a key
+(discovered during phase-2 build; `test-authoring` is not one of
+contract §2's sanctioned kinds, so the override mechanism cannot carry
+it). Phase-2 `test-authoring` records state their current `loop_state:`
+explicitly using this set, replacing free-text progress narrative; the
+set is enforced by convention here, not by a gate.
