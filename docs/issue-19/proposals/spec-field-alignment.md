@@ -144,6 +144,15 @@ No `hooks/*.sh` file changes — see Rationale.
   (issue-1, 7, 10, 13, 16) to the new `loop_state:` vocabulary
   retroactively — those are closed, landed records; only the rulebook's
   forward-looking guidance changes.
+- Fixing the record-path mismatch a warrant hunt surfaced on this PR
+  (`docs/reports/2026-08-09-hunt-spec-field-alignment.md`): the three
+  phase-2 content gates only fire on writes to
+  `docs/issue-<n>/reports/test-authoring.md`, but this session (role
+  `implementation`, per contract v3's own role-directed path) writes its
+  own record to `docs/issue-19/reports/implementation.md`, which none of
+  those gates match. Pre-existing role/path mismatch, not introduced by
+  this proposal; flagged here rather than silently absorbed into this
+  issue's scope.
 
 ## How you'll know it worked
 
