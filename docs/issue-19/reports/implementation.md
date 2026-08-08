@@ -1,9 +1,9 @@
 ---
-code_under_review: UNKNOWN
+code_under_review: test-authoring/README.md, xunit-suite-patterns/README.md, ep-bva-technique/README.md
 type: docs
 breaking: false
 verdict: pass
-loop_state: committing
+loop_state: landed
 ---
 
 # Phase-2 implementation record (issue-19)
