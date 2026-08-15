@@ -49,3 +49,20 @@ statement, is present).
 18. **Publicizing Frozen State / Wet Floor** — a test leaves shared or
     static state modified after it finishes, leaving a "wet floor" that
     trips up whichever test runs next.
+
+## Suite-verification checks (beyond the smell catalog above)
+
+19. **Never-Fail Test** — a test whose assertions could not have failed
+    given how its fixture is written (e.g. it only re-asserts data the
+    fixture just set, without exercising the behavior under test) is not
+    isolation evidence, no matter how green it runs. When a smell list is
+    written for a newly added suite, confirm each new test was checked
+    against a state where the behavior under test did not yet exist, and
+    that it failed there — a test never observed to fail is unverified as
+    a real check, not merely unverified as passing.
+20. **Premature Fixture Capacity** — a shared fixture that builds state or
+    capability no currently-passing test in the suite actually consumes
+    should be trimmed to what the suite exercises today. Capacity built
+    for anticipated future tests is General Fixture smell (item 2 above)
+    wearing a different name: judge a fixture against the suite that
+    exists, not the suite that might exist later.
